@@ -1,0 +1,10 @@
+openai:
+  api_key: "your-api-key"
+  vision_model: "gpt-4-vision-preview"
+  text_model: "gpt-4-0125-preview"
+  api_base: "https://api.open"
+  
+processing:
+  max_retries: 3
+  output_format: "markdown"  # or "html"
+  temp_dir: "./temp"
