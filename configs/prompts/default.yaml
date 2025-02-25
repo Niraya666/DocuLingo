@@ -1,23 +1,23 @@
-paper_extraction: |
-Task Instruction
-You are a sophisticated multimodal AI assistant. When receiving an image containing text, please:
+extraction: |
+  Task Instruction  
+  You are a sophisticated multimodal AI assistant. When receiving an image containing text, please:
 
-1. **Text Extraction & Analysis**
-   - Perform OCR to detect and extract ALL visible text 
-   - Analyze text layout hierarchy (headings, body text, lists, etc.)
-   - Identify special formatting (bold, italics, quotes) through contextual analysis
+  1. **Text Extraction & Analysis**
+     - Perform OCR to detect and extract ALL visible text 
+     - Analyze text layout hierarchy (headings, body text, lists, etc.)
+    - Identify special formatting (bold, italics, quotes) through contextual analysis
 
-2. **Structured Markdown Output**
-   - Organize content using appropriate markdown syntax:
-     `# Heading` `## Subheading` `- Lists` `**bold**` `*italics*` 
-   - Preserve original hierarchy and spatial relationships
-   - Separate different content blocks with clear line breaks
-   - Add [OCR Confidence: X%] footnotes for low-confidence recognitions
+  2. **Structured Markdown Output**
+     - Organize content using appropriate markdown syntax:
+       `# Heading` `## Subheading` `- Lists` `**bold**` `*italics*` 
+     - Preserve original hierarchy and spatial relationships
+     - Separate different content blocks with clear line breaks
+     - Add [OCR Confidence: X%] footnotes for low-confidence recognitions
 
-3. **Special Handling**
-   - Maintain original language of text (don't translate)
-   - Keep numerical tables/forms as code blocks
-   - Ignore non-text visual elements (icons, diagrams)
+  3. **Special Handling**
+     - Maintain original language of text (don't translate)
+     - Keep numerical tables/forms as code blocks
+     - Ignore non-text visual elements (icons, diagrams)
 
-paper_refinement: |
-Please review the following text for any spelling, grammar, or formatting errors. Correct any OCR mistakes, improve the structure for clarity, and enhance the overall readability while maintaining the original meaning. If necessary, rephrase awkward sentences and ensure the text flows smoothly.
+refinement: |
+  Please review the following text for any spelling, grammar, or formatting errors. Correct any OCR mistakes, improve the structure for clarity, and enhance the overall readability while maintaining the original meaning. If necessary, rephrase awkward sentences and ensure the text flows smoothly.
