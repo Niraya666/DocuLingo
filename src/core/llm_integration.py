@@ -1,3 +1,4 @@
+import os
 from openai import OpenAI
 from pydantic import BaseModel
 import base64
@@ -11,6 +12,10 @@ class ExtractionResult(BaseModel):
     content: str
     metadata: dict
     document_type: str
+
+class RefinementResult(BaseModel):
+    refined_content: str
+    changes_made: list[str]
 
 class LLMProcessor:
     def __init__(self, settings):
@@ -29,39 +34,83 @@ class LLMProcessor:
         
    
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    def process_image(self, image_path, doc_type="default"):
-        # 获取动态提示词
-        prompt = self.prompt_manager.get_prompt(doc_type, "extraction")
-        with open(image_path, "rb") as image_file:
-            base64_image = base64.b64encode(image_file.read()).decode("utf-8")
-        # 构建消息(示例)
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/png;base64,{base64_image}",
-                        "detail":"high"
+    def process_image(self, image_path, doc_type="default")-> ExtractionResult:
+        try:
+            # 获取动态提示词
+            prompt = self.prompt_manager.get_prompt(doc_type, "extraction")
+            base64_image = self._load_image(image_path)
+            # 构建消息(示例)
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{base64_image}",
+                            "detail":"high"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": prompt
                     }
-                },
-                {
-                    "type": "text",
-                    "text": prompt
-                }
-            ]
-        }]
-
-       
-        response = self.client.chat.completions.create(
-            model=self.settings.VISION_MODEL,
-            messages=messages,
-        )
+                ]
+            }]
 
         
-        # return response
-        return self._parse_response(response)
+            response = self.client.chat.completions.create(
+                model=self.settings.VISION_MODEL,
+                messages=messages,
+                temperature=0.1
+            )
+
+            
+            # return response
+            return self._parse_response(response)
+        except Exception as e:
+            raise ValueError(f"处理图片失败: {str(e)}")
     
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    def refine_text(
+        self,
+        text: str,
+        doc_type: str = "default",
+    )-> RefinementResult:
+        """
+        文本润色方法
+        """
+        try:
+            # 1. 获取润色提示词
+            prompt = self.prompt_manager.get_prompt(
+                doc_type=doc_type,
+                stage="refinement"
+            )
+            
+            # 2. 构建消息
+            messages = [{
+                "role": "user",
+                "content": f"{prompt}\n\n---\n\n{text}"
+            }]
+            
+            # 3. 调用文本API
+            response = self.client.chat.completions.create(
+                model=self.settings.TEXT_MODEL,
+                messages=messages,
+                temperature=0.1
+            )
+            
+            # 4. 解析响应
+            return self._parse_response(response)
+        except Exception as e:
+            raise ValueError(f"润色失败: {str(e)}")
+
+    def _load_image(self, image_path: str) -> str:
+        """加载并编码图片"""
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"图片文件不存在: {image_path}")
+            
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode("utf-8")
     def _validate_response(self, json_str):
         """验证响应格式"""
         try:
@@ -112,25 +161,3 @@ class LLMProcessor:
             
         except Exception as e:
             raise ValueError(f"解析响应失败: {str(e)}")
-    
-    def post_process(self, text, document_type):
-        """二次润色处理"""
-        prompt = self._get_postprocess_prompt(document_type)
-        response = self.client.chat.completions.create(
-            model=self.config["openai"]["text_model"],
-            messages=[{
-                "role": "user",
-                "content": prompt + "\n\nText to refine:\n" + text
-            }],
-            temperature=0.2
-        )
-        return response.choices[0].message.content
-    
-    def _get_postprocess_prompt(self, doc_type):
-        """获取不同文档类型的处理提示"""
-        prompts = {
-            "paper": "请将以下学术论文内容转换为规范的Markdown格式,修正排版错误,保留数学公式和引用格式。",
-            "textbook": "请将教材内容转换为结构清晰的Markdown,确保章节标题、图表说明格式正确。",
-            "default": "请将以下文本内容进行整理和润色,保持原有信息的同时优化可读性。"
-        }
-        return prompts.get(doc_type, prompts["default"])
