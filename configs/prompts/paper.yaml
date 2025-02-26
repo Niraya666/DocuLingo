@@ -3,6 +3,7 @@ extraction: |
   1. 保留所有数学公式的LaTeX格式
   2. 参考文献按[1]格式标注
   3. 使用三级标题体系组织内容
+  4. 最终结果使用Markdown格式输出 ```markdown ``` 
 
 refinement: |
   请对以下学术论文内容进行专业润色:
