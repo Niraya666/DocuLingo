@@ -33,8 +33,8 @@ class LLMProcessor:
         return self.client
         
    
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    def process_image(self, image_path, doc_type="default")-> ExtractionResult:
+    #@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    def process_image(self, image_path, doc_type="default",max_tokens=32768)-> ExtractionResult:
         try:
             # 获取动态提示词
             prompt = self.prompt_manager.get_prompt(doc_type, "extraction")
@@ -61,7 +61,8 @@ class LLMProcessor:
             response = self.client.chat.completions.create(
                 model=self.settings.VISION_MODEL,
                 messages=messages,
-                temperature=0.1
+                temperature=0.1,
+                max_tokens=max_tokens
             )
 
             
@@ -70,11 +71,12 @@ class LLMProcessor:
         except Exception as e:
             raise ValueError(f"处理图片失败: {str(e)}")
     
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    #@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def refine_text(
         self,
         text: str,
         doc_type: str = "default",
+        max_tokens: int = 4096
     )-> RefinementResult:
         """
         文本润色方法
@@ -96,7 +98,8 @@ class LLMProcessor:
             response = self.client.chat.completions.create(
                 model=self.settings.TEXT_MODEL,
                 messages=messages,
-                temperature=0.1
+                temperature=0.1,
+                max_tokens=max_tokens
             )
             
             # 4. 解析响应
