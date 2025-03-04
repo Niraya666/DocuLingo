@@ -7,6 +7,9 @@ from pathlib import Path
 from tenacity import retry, stop_after_attempt, wait_exponential
 from src.core.api_clients.openai_client import OpenAIClient
 from src.core.prompt_manager import PromptManager
+from concurrent.futures import ThreadPoolExecutor
+from typing import List
+import asyncio
 # 定义输出结构
 class ExtractionResult(BaseModel):
     content: str
@@ -22,19 +25,50 @@ class LLMProcessor:
         self.settings = settings
         self.prompt_manager = PromptManager(settings.PROMPTS_DIR)
         self.client = self._init_client(settings)
+        # 创建线程池
+        self.executor = ThreadPoolExecutor(settings.MAX_WORKERS)
+        
     
     def _init_client(self, settings):
     
-        # return OpenAIClient(settings)
+        
         self.client = OpenAI(
             api_key=settings.OPENAI_API_KEY,
             base_url=settings.API_BASE
         )
         return self.client
         
-   
-    #@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    def process_image(self, image_path, doc_type="default",max_tokens=32768)-> ExtractionResult:
+    async def async_process_images_concurrent(self, image_paths: List[str], doc_type="default", max_tokens=32768, json_mode=False):
+        """并发处理多个图片"""
+        loop = asyncio.get_event_loop()
+        tasks = []
+        
+        for image_path in image_paths:
+            # 使用线程池执行API调用
+            task = loop.run_in_executor(
+                self.executor,
+                self.process_image,
+                image_path,
+                doc_type,
+                max_tokens,
+                json_mode
+            )
+            tasks.append(task)
+            
+        # 等待所有任务完成
+        results = await asyncio.gather(*tasks)
+        return results
+
+    def process_images_batch(self, image_paths: List[str], doc_type="default", max_tokens=32768,json_mode=False):
+        """批量处理图片的同步方法封装"""
+        loop = asyncio.get_event_loop()
+        results = loop.run_until_complete(
+            self.async_process_images_concurrent(image_paths, doc_type, max_tokens,json_mode)
+        )
+        return results
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    def process_image(self, image_path, doc_type="default",max_tokens=32768,json_mode=False)-> ExtractionResult:
         try:
             # 获取动态提示词
             prompt = self.prompt_manager.get_prompt(doc_type, "extraction")
@@ -57,21 +91,22 @@ class LLMProcessor:
                 ]
             }]
 
-        
-            response = self.client.chat.completions.create(
-                model=self.settings.VISION_MODEL,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=max_tokens
-            )
-
+            api_params = {
+                "model": self.settings.VISION_MODEL,
+                "messages": messages,
+                "temperature": 0.1,
+                "max_tokens": max_tokens
+            }
+            if json_mode:
+                api_params["response_format"] = {"type": "json_object"}
+            response = self.client.chat.completions.create(**api_params)
             
-            # return response
+            
             return self._parse_response(response)
         except Exception as e:
             raise ValueError(f"处理图片失败: {str(e)}")
     
-    #@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def refine_text(
         self,
         text: str,
