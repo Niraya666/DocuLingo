@@ -13,3 +13,6 @@ refinement: |
   1. 统一使用IEEE引用格式
   2. 数学公式使用块级公式格式
   3. 修复可能的OCR识别错误
+
+parse_type: |
+  markdown
