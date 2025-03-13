@@ -6,7 +6,7 @@ import base64
 import io
 from collections import namedtuple
 
-ImageInfo = namedtuple('ImageInfo', ['bbox', 'index'])
+ImageInfo = namedtuple('ImageInfo', ['bbox', 'index', 'page'])
 
 def crop_image(image_path, bbox, output_path=None, output_format='PNG'):
     """
@@ -168,3 +168,85 @@ def process_html_content(html_str, original_image_path, output_dir="images", emb
     return body_content.strip(), image_bboxes, image_paths, image_index
 
 
+def combine_html_contents(page_contents, output_dir="images", embed_base64=False):
+    """
+    处理多个HTML内容并合并成一个完整的文档
+    
+    Args:
+        page_contents: 列表，每项包含页码和内容信息的字典
+        output_dir: 图片保存目录
+        embed_base64: 是否将图像转换为base64格式嵌入HTML
+    
+    Returns:
+        tuple: (complete_html, all_image_info)
+            - complete_html: 完整的HTML文档
+            - all_image_info: 所有图像信息的列表
+    """
+    # 按页码排序
+    sorted_pages = sorted(page_contents, key=lambda x: x["page"])
+    
+    all_contents = []
+    all_image_info = []
+    next_index = 1  # 起始图像索引
+    
+    # 处理每个页面的HTML内容
+    for page_data in sorted_pages:
+        page_num = page_data["page"]
+        html_content = page_data["content"]["html_content"]
+        image_path = page_data["content"]["original_image_path"]
+        
+        # 处理当前页面的HTML，使用累积的索引
+        content, bboxes, paths, next_index = process_html_content(
+            html_content, 
+            image_path, 
+            output_dir=output_dir,
+            embed_base64=embed_base64,
+            start_index=next_index,
+            page_num=page_num
+        )
+        
+        # 添加页面分隔符
+        if page_num > 1:
+            all_contents.append(f'<div class="page-break"></div>')
+        
+        all_contents.append(f'<div class="page" id="page-{page_num}">')
+        all_contents.append(content)
+        all_contents.append('</div>')
+        
+        # 收集图像信息
+        for i, (bbox, path) in enumerate(zip(bboxes, paths)):
+            all_image_info.append((bbox, path))
+    
+    # 组合成完整的HTML文档
+    _content = '\n'.join(all_contents)
+    complete_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Combined Document</title>
+    <style>
+        body {{
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .page {{
+            margin-bottom: 40px;
+        }}
+        .page-break {{
+            height: 1px;
+            background-color: #ddd;
+            margin: 30px 0;
+        }}
+        img {{
+            max-width: 100%;
+            height: auto;
+        }}
+    </style>
+</head>
+<body>
+   {_content}
+</body>
+</html>"""
+    
+    return complete_html, all_image_info
