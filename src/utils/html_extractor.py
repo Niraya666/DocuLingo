@@ -6,7 +6,7 @@ import base64
 import io
 from collections import namedtuple
 
-ImageInfo = namedtuple('ImageInfo', ['bbox', 'index'])
+ImageInfo = namedtuple('ImageInfo', ['bbox', 'index', 'page'])
 
 def crop_image(image_path, bbox, output_path=None, output_format='PNG'):
     """
@@ -64,71 +64,63 @@ def image_to_base64(image, format='PNG'):
     
     return f"data:image/{format.lower()};base64,{img_str}"
 
-def process_html_content(html_str, original_image_path, output_dir=None, image_relative_path=None, embed_base64=False):
+def process_html_content(html_str, original_image_path, output_dir="images", embed_base64=False, start_index=1, page_num=None):
     """
-    处理HTML内容，提取图像，格式化HTML
+    处理单个HTML内容
     
     Args:
         html_str: 包含HTML内容的字符串
         original_image_path: 原始图像的路径
-        output_dir: 输出目录，用于保存截取的图像，如果不指定则使用当前目录
-        image_relative_path: HTML中引用图片的相对路径，如 "images/" 或 "../images/"
+        output_dir: 图片保存目录
         embed_base64: 是否将图像转换为base64格式嵌入HTML
+        start_index: 图像索引的起始值
+        page_num: 当前处理的页码
     
     Returns:
-        tuple: (formatted_html, image_bboxes, image_paths)
-            - formatted_html: 格式化后的HTML字符串
+        tuple: (formatted_html, image_bboxes, image_paths, next_index)
+            - formatted_html: 格式化后的HTML字符串（只包含body内容）
             - image_bboxes: 包含图像bbox信息的列表
             - image_paths: 保存的图像路径列表（绝对路径）
+            - next_index: 下一页图像应该使用的起始索引
     """
-    # 设置默认输出目录
-    if output_dir is None:
-        output_dir = '.'
     os.makedirs(output_dir, exist_ok=True)
-    
-    # 如果未指定相对路径，使用空字符串
-    if image_relative_path is None:
-        image_relative_path = ''
     
     soup = BeautifulSoup(html_str, 'html.parser')
     image_bboxes = []
     image_paths = []
-    image_index = 1
+    image_index = start_index
     
     for div in soup.find_all('div', class_='image'):
         bbox_str = div.get('data-bbox')
         if bbox_str:
-            # 将bbox字符串转换为数字列表
             bbox = [int(x) for x in bbox_str.split()]
-            image_bboxes.append(ImageInfo(bbox=bbox, index=image_index))
+            image_bboxes.append(ImageInfo(bbox=bbox, index=image_index, page=page_num))
             
             # 设置图像文件名和路径
             image_filename = f"image_{image_index}.png"
             image_path = os.path.join(output_dir, image_filename)
-            image_paths.append(os.path.abspath(image_path))  # 保存绝对路径
+            image_paths.append(os.path.abspath(image_path))
             
             # 截取并保存图像
             cropped_img = crop_image(original_image_path, bbox, image_path)
             
-            # 更新div的属性
+            # 更新div和img标签
             div['id'] = f'image_{image_index}'
             if 'data-bbox' in div.attrs:
                 del div['data-bbox']
             
-            # 查找或创建img标签
-            img_tag = div.find('img')
-            if not img_tag:
-                img_tag = soup.new_tag('img')
-                div.append(img_tag)
-            elif 'data-bbox' in img_tag.attrs:
+            img_tag = div.find('img') or soup.new_tag('img')
+            if 'data-bbox' in img_tag.attrs:
                 del img_tag['data-bbox']
             
-            # 更新img标签的src属性
+            # 更新图片源
             if embed_base64 and cropped_img:
                 img_tag['src'] = image_to_base64(cropped_img)
             else:
-                # 使用相对路径引用图片
-                img_tag['src'] = f"{image_relative_path}{image_filename}"
+                img_tag['src'] = os.path.join(output_dir, image_filename)
+            
+            if img_tag.parent is None:
+                div.append(img_tag)
             
             image_index += 1
     
@@ -170,17 +162,91 @@ def process_html_content(html_str, original_image_path, output_dir=None, image_r
                 if 'format' in tag.attrs:
                     del tag['format']
     
-    # 格式化HTML输出
-    body_content = soup.body.prettify() if soup.body else ""
+    # 提取body内容
+    body_content = soup.body.decode_contents() if soup.body else ""
     
-    # 创建标准的HTML文件内容
-    standard_html = f"""<!DOCTYPE html>
+    return body_content.strip(), image_bboxes, image_paths, image_index
+
+
+def combine_html_contents(page_contents, output_dir="images", embed_base64=False):
+    """
+    处理多个HTML内容并合并成一个完整的文档
+    
+    Args:
+        page_contents: 列表，每项包含页码和内容信息的字典
+        output_dir: 图片保存目录
+        embed_base64: 是否将图像转换为base64格式嵌入HTML
+    
+    Returns:
+        tuple: (complete_html, all_image_info)
+            - complete_html: 完整的HTML文档
+            - all_image_info: 所有图像信息的列表
+    """
+    # 按页码排序
+    sorted_pages = sorted(page_contents, key=lambda x: x["page"])
+    
+    all_contents = []
+    all_image_info = []
+    next_index = 1  # 起始图像索引
+    
+    # 处理每个页面的HTML内容
+    for page_data in sorted_pages:
+        page_num = page_data["page"]
+        html_content = page_data["content"]["html_content"]
+        image_path = page_data["content"]["original_image_path"]
+        
+        # 处理当前页面的HTML，使用累积的索引
+        content, bboxes, paths, next_index = process_html_content(
+            html_content, 
+            image_path, 
+            output_dir=output_dir,
+            embed_base64=embed_base64,
+            start_index=next_index,
+            page_num=page_num
+        )
+        
+        # 添加页面分隔符
+        if page_num > 1:
+            all_contents.append(f'<div class="page-break"></div>')
+        
+        all_contents.append(f'<div class="page" id="page-{page_num}">')
+        all_contents.append(content)
+        all_contents.append('</div>')
+        
+        # 收集图像信息
+        for i, (bbox, path) in enumerate(zip(bboxes, paths)):
+            all_image_info.append((bbox, path))
+    
+    # 组合成完整的HTML文档
+    _content = '\n'.join(all_contents)
+    complete_html = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Processed Document</title>
+    <title>Combined Document</title>
+    <style>
+        body {{
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .page {{
+            margin-bottom: 40px;
+        }}
+        .page-break {{
+            height: 1px;
+            background-color: #ddd;
+            margin: 30px 0;
+        }}
+        img {{
+            max-width: 100%;
+            height: auto;
+        }}
+    </style>
 </head>
-{body_content}
+<body>
+   {_content}
+</body>
 </html>"""
     
-    return standard_html, image_bboxes, image_paths
+    return complete_html, all_image_info
