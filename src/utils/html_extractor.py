@@ -64,31 +64,23 @@ def image_to_base64(image, format='PNG'):
     
     return f"data:image/{format.lower()};base64,{img_str}"
 
-def process_html_content(html_str, original_image_path, output_dir=None, image_relative_path=None, embed_base64=False):
+def process_html_content(html_str, original_image_path, output_dir="images", embed_base64=False):
     """
-    处理HTML内容，提取图像，格式化HTML
+    处理单个HTML内容
     
     Args:
         html_str: 包含HTML内容的字符串
         original_image_path: 原始图像的路径
-        output_dir: 输出目录，用于保存截取的图像，如果不指定则使用当前目录
-        image_relative_path: HTML中引用图片的相对路径，如 "images/" 或 "../images/"
+        output_dir: 图片保存目录（同时也用作HTML中的相对引用路径）
         embed_base64: 是否将图像转换为base64格式嵌入HTML
     
     Returns:
         tuple: (formatted_html, image_bboxes, image_paths)
-            - formatted_html: 格式化后的HTML字符串
+            - formatted_html: 格式化后的HTML字符串（只包含body内容）
             - image_bboxes: 包含图像bbox信息的列表
             - image_paths: 保存的图像路径列表（绝对路径）
     """
-    # 设置默认输出目录
-    if output_dir is None:
-        output_dir = '.'
     os.makedirs(output_dir, exist_ok=True)
-    
-    # 如果未指定相对路径，使用空字符串
-    if image_relative_path is None:
-        image_relative_path = ''
     
     soup = BeautifulSoup(html_str, 'html.parser')
     image_bboxes = []
@@ -98,37 +90,34 @@ def process_html_content(html_str, original_image_path, output_dir=None, image_r
     for div in soup.find_all('div', class_='image'):
         bbox_str = div.get('data-bbox')
         if bbox_str:
-            # 将bbox字符串转换为数字列表
             bbox = [int(x) for x in bbox_str.split()]
             image_bboxes.append(ImageInfo(bbox=bbox, index=image_index))
             
             # 设置图像文件名和路径
             image_filename = f"image_{image_index}.png"
             image_path = os.path.join(output_dir, image_filename)
-            image_paths.append(os.path.abspath(image_path))  # 保存绝对路径
+            image_paths.append(os.path.abspath(image_path))
             
             # 截取并保存图像
             cropped_img = crop_image(original_image_path, bbox, image_path)
             
-            # 更新div的属性
+            # 更新div和img标签
             div['id'] = f'image_{image_index}'
             if 'data-bbox' in div.attrs:
                 del div['data-bbox']
             
-            # 查找或创建img标签
-            img_tag = div.find('img')
-            if not img_tag:
-                img_tag = soup.new_tag('img')
-                div.append(img_tag)
-            elif 'data-bbox' in img_tag.attrs:
+            img_tag = div.find('img') or soup.new_tag('img')
+            if 'data-bbox' in img_tag.attrs:
                 del img_tag['data-bbox']
             
-            # 更新img标签的src属性
+            # 更新图片源
             if embed_base64 and cropped_img:
                 img_tag['src'] = image_to_base64(cropped_img)
             else:
-                # 使用相对路径引用图片
-                img_tag['src'] = f"{image_relative_path}{image_filename}"
+                img_tag['src'] = os.path.join(output_dir, image_filename)
+            
+            if img_tag.parent is None:
+                div.append(img_tag)
             
             image_index += 1
     
