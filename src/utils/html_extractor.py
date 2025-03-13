@@ -64,34 +64,37 @@ def image_to_base64(image, format='PNG'):
     
     return f"data:image/{format.lower()};base64,{img_str}"
 
-def process_html_content(html_str, original_image_path, output_dir="images", embed_base64=False):
+def process_html_content(html_str, original_image_path, output_dir="images", embed_base64=False, start_index=1, page_num=None):
     """
     处理单个HTML内容
     
     Args:
         html_str: 包含HTML内容的字符串
         original_image_path: 原始图像的路径
-        output_dir: 图片保存目录（同时也用作HTML中的相对引用路径）
+        output_dir: 图片保存目录
         embed_base64: 是否将图像转换为base64格式嵌入HTML
+        start_index: 图像索引的起始值
+        page_num: 当前处理的页码
     
     Returns:
-        tuple: (formatted_html, image_bboxes, image_paths)
+        tuple: (formatted_html, image_bboxes, image_paths, next_index)
             - formatted_html: 格式化后的HTML字符串（只包含body内容）
             - image_bboxes: 包含图像bbox信息的列表
             - image_paths: 保存的图像路径列表（绝对路径）
+            - next_index: 下一页图像应该使用的起始索引
     """
     os.makedirs(output_dir, exist_ok=True)
     
     soup = BeautifulSoup(html_str, 'html.parser')
     image_bboxes = []
     image_paths = []
-    image_index = 1
+    image_index = start_index
     
     for div in soup.find_all('div', class_='image'):
         bbox_str = div.get('data-bbox')
         if bbox_str:
             bbox = [int(x) for x in bbox_str.split()]
-            image_bboxes.append(ImageInfo(bbox=bbox, index=image_index))
+            image_bboxes.append(ImageInfo(bbox=bbox, index=image_index, page=page_num))
             
             # 设置图像文件名和路径
             image_filename = f"image_{image_index}.png"
@@ -159,17 +162,9 @@ def process_html_content(html_str, original_image_path, output_dir="images", emb
                 if 'format' in tag.attrs:
                     del tag['format']
     
-    # 格式化HTML输出
-    body_content = soup.body.prettify() if soup.body else ""
+    # 提取body内容
+    body_content = soup.body.decode_contents() if soup.body else ""
     
-    # 创建标准的HTML文件内容
-    standard_html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Processed Document</title>
-</head>
-{body_content}
-</html>"""
-    
-    return standard_html, image_bboxes, image_paths
+    return body_content.strip(), image_bboxes, image_paths, image_index
+
+
