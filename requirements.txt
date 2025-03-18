@@ -5,7 +5,7 @@ tenacity
 pydantic-settings
 pyyaml
 qwen-vl-utils
-pillow
+Pillow
 pytest
 bs4
-#qwen_agent
+argparse
