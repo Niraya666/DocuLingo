@@ -1,14 +1,17 @@
 import argparse
-from src.core.llm_integration import LLMProcessor, ExtractionResult
+import pathlib
+
+from src.core.llm_integration import LLMProcessor
 from src.utils.pdf_processor import PDFProcessor
+from src.utils.ppt_processor import convert_ppt_to_pdf
 from src.utils.html_extractor import combine_html_contents
 from configs.settings import settings
 import os
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='PDF转HTML工具')
+    parser = argparse.ArgumentParser(description='PDF/Office文档转HTML工具')
     parser.add_argument('--pdf_path', type=str, default="assets/test.pdf",
-                      help='Path to the input PDF file')
+                      help='Path to the input PDF or Office file')
     parser.add_argument('--output_dir', type=str, default="assets/",
                       help='Directory to save intermediate images')
     parser.add_argument('--dpi', type=int, default=150,
@@ -17,6 +20,8 @@ def parse_args():
                       help='Maximum tokens for LLM processing')
     parser.add_argument('--doc_type', type=str, default='qwen_vl_html',
                       help='Document type for processing')
+    parser.add_argument('--convert_office', action='store_true',
+                      help='Enable Office format conversion using LibreOffice')
     return parser.parse_args()
 
 def main():
@@ -27,12 +32,23 @@ def main():
     images_dir = os.path.join(args.output_dir, 'pdf_images')
     os.makedirs(images_dir, exist_ok=True)
     
+    # 检查文件类型，处理Office文档
+    input_file_path = args.pdf_path
+    file_extension = pathlib.Path(input_file_path).suffix.lower()
+    
+    # 如果是PPTX/PPT格式且启用了Office转换选项
+    if args.convert_office and file_extension in ['.pptx', '.ppt', '.doc', '.docx', '.xls', '.xlsx']:
+        from src.utils.ppt_processor import convert_ppt_to_pdf
+        pdf_output_path = os.path.join(args.output_dir, os.path.basename(input_file_path).replace(file_extension, '.pdf'))
+        input_file_path = convert_ppt_to_pdf(input_file_path, pdf_output_path)
+        print(f"已将 {file_extension} 文件转换为 PDF: {input_file_path}")
+    
     processor = LLMProcessor(settings)
     pdf_processor = PDFProcessor(dpi=args.dpi)
 
     # PDF转图像
     image_paths = pdf_processor.pdf_to_images(
-        pdf_path=args.pdf_path,
+        pdf_path=input_file_path,
         output_dir=images_dir
     )
 
@@ -53,8 +69,14 @@ def main():
         embed_base64=False
     )
 
-    # 保存HTML文件
-    html_output_path = os.path.join(args.output_dir, 'output.html')
+    # # 保存HTML文件
+    # html_output_path = os.path.join(args.output_dir, 'output.html')
+    # with open(html_output_path, "w", encoding="utf-8") as f:
+    #     f.write(complete_html)
+    # 获取输入文件的基本名称（不含扩展名）并添加.html扩展名
+    input_filename = os.path.splitext(os.path.basename(args.pdf_path))[0]
+    html_output_path = os.path.join(args.output_dir, f"{input_filename}.html")
+    
     with open(html_output_path, "w", encoding="utf-8") as f:
         f.write(complete_html)
 
