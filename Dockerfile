@@ -1,4 +1,5 @@
-FROM --platform=amd64 python:3.11
+FROM doculingo_app:0.0
+
 # Set the working directory in the container
 WORKDIR /app
 
@@ -9,21 +10,21 @@ ADD . /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install additional dependencies
-RUN apt-get update && apt-get install -y vim
+# RUN apt-get update && apt-get install -y vim
 
-# RUN apt-get update && \
-#     apt-get install -y --no-install-recommends \
-#     # libreoffice \
-#     poppler-utils \
-#     unoconv \
-#     fonts-wqy-zenhei \
-#     fonts-wqy-microhei \
-#     fonts-noto-cjk \
-#     libmupdf-dev \
-#     mupdf \
-#     mupdf-tools && \
-#     apt-get clean && \
-#     rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libreoffice \
+    poppler-utils \
+    unoconv \
+    fonts-wqy-zenhei \
+    fonts-wqy-microhei \
+    fonts-noto-cjk \
+    libmupdf-dev \
+    mupdf \
+    mupdf-tools && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
     
 # Expose port 80 to the outside world
