@@ -87,7 +87,7 @@ TEXT_MODEL=Qwen/Qwen2.5-72B-Instruct
 ### Converting PDF to HTML with Images
 
 ```bash
-python pdf_to_html_with_image.py \
+python main.py \
     --pdf_path your-file-path \
     --output_dir path-to-save \
     --doc_type qwen_vl_html
@@ -96,7 +96,7 @@ python pdf_to_html_with_image.py \
 ### Converting Office Documents (PPTX, DOCX) to HTML with Images
 
 ```bash
-python pdf_to_html_with_image.py \
+python main.py \
     --pdf_path your-file-path \
     --output_dir path-to-save \
     --dpi 150 \

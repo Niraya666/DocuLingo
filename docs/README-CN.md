@@ -83,7 +83,7 @@ TEXT_MODEL=Qwen/Qwen2.5-72B-Instruct
 ### 将 PDF 转换为 HTML 并包含图像
 
 ```bash
-python pdf_to_html_with_image.py \
+python main.py \
     --pdf_path your-file-path \
     --output_dir path-to-save \
     --doc_type qwen_vl_html
@@ -92,7 +92,7 @@ python pdf_to_html_with_image.py \
 ### 将 Office 文档（PPTX、DOCX）转换为 HTML 并包含图像
 
 ```bash
-python pdf_to_html_with_image.py \
+python main.py \
     --pdf_path your-file-path \
     --output_dir path-to-save \
     --dpi 150 \
