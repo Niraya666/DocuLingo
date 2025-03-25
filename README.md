@@ -87,7 +87,7 @@ TEXT_MODEL=Qwen/Qwen2.5-72B-Instruct
 ### Converting PDF to HTML with Images
 
 ```bash
-python pdf_to_html_with_image.py \
+python main.py \
     --pdf_path your-file-path \
     --output_dir path-to-save \
     --doc_type qwen_vl_html
@@ -96,7 +96,7 @@ python pdf_to_html_with_image.py \
 ### Converting Office Documents (PPTX, DOCX) to HTML with Images
 
 ```bash
-python pdf_to_html_with_image.py \
+python main.py \
     --pdf_path your-file-path \
     --output_dir path-to-save \
     --dpi 150 \
@@ -120,13 +120,12 @@ python pdf_to_html_with_image.py \
 
 ### Concurrency and Retry Configuration
 
-You can adjust the concurrency and retry parameters in `configs/settings.yaml`:
+You can adjust the concurrency and retry parameters in `.env`:
 
-```yaml
-# configs/settings.yaml
-processing:
-  max_retries: 3    # Maximum number of retry attempts for failed requests
-  max_workers: 2    # Maximum number of concurrent workers for parallel processing
+```
+
+MAX_RETRIES: 3    # Maximum number of retry attempts for failed requests
+MAX_WORKERS: 2    # Maximum number of concurrent workers for parallel processing
 ```
 
 ## 🙏 Acknowledgements
