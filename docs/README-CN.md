@@ -116,13 +116,11 @@ python pdf_to_html_with_image.py \
 
 ### 并发和重试配置
 
-你可以在 `configs/settings.yaml` 中调整并发和重试参数：
+你可以在 `.env` 中调整并发和重试参数：
 
-```yaml
-# configs/settings.yaml
-processing:
-  max_retries: 3    # 失败请求的最大重试次数
-  max_workers: 2    # 并行处理的最大工作线程数
+```
+MAX_RETRIES: 3    # Maximum number of retry attempts for failed requests
+MAX_WORKERS: 2    # Maximum number of concurrent workers for parallel processing
 ```
 
 ## 🙏 致谢

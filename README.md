@@ -120,13 +120,12 @@ python pdf_to_html_with_image.py \
 
 ### Concurrency and Retry Configuration
 
-You can adjust the concurrency and retry parameters in `configs/settings.yaml`:
+You can adjust the concurrency and retry parameters in `.env`:
 
-```yaml
-# configs/settings.yaml
-processing:
-  max_retries: 3    # Maximum number of retry attempts for failed requests
-  max_workers: 2    # Maximum number of concurrent workers for parallel processing
+```
+
+MAX_RETRIES: 3    # Maximum number of retry attempts for failed requests
+MAX_WORKERS: 2    # Maximum number of concurrent workers for parallel processing
 ```
 
 ## 🙏 Acknowledgements
