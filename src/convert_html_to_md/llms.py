@@ -2,8 +2,10 @@ from dotenv import load_dotenv
 import os
 
 from openai import OpenAI
-from typing import TypeVar, Optional, Union, Type, Any, Dict, List
+from typing import TypeVar, Optional, Union, Type, Any, Dict, List, Literal
 from pydantic import BaseModel
+import json
+
 
 load_dotenv()
 
@@ -17,9 +19,6 @@ client = OpenAI(
 
 
 
-from typing import TypeVar, Optional, Union, Type, Any, Dict, List, Literal
-from pydantic import BaseModel
-import json
 
 T = TypeVar("T", bound=BaseModel)
 
