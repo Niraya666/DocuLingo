@@ -1,0 +1,6 @@
+openai 
+pydantic 
+pydantic-settings
+pyyaml
+bs4
+tqdm
