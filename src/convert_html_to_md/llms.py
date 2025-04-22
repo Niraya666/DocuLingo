@@ -17,6 +17,10 @@ client = OpenAI(
 
 
 
+from typing import TypeVar, Optional, Union, Type, Any, Dict, List, Literal
+from pydantic import BaseModel
+import json
+
 T = TypeVar("T", bound=BaseModel)
 
 def unified_chat_completion(
@@ -24,6 +28,7 @@ def unified_chat_completion(
     model: str,
     response_format: Optional[Type[T]] = None,
     provider: Optional[str] = None,
+    return_format: Literal["pydantic", "dict", "json"] = "pydantic",
     max_tokens: int = 1500,
     temperature: float = 0.0,
     top_p: float = 1.0,
@@ -40,6 +45,7 @@ def unified_chat_completion(
         model: 使用的模型名称
         response_format: 结构化输出格式，传入 Pydantic BaseModel 启用结构化输出
         provider: 模型提供商，可选值: "openai", "vllm", "openrouter"，若不提供则尝试从model名称推断
+        return_format: 结构化数据的返回格式，可选值: "pydantic"(默认), "dict", "json"
         max_tokens: 生成的最大 token 数
         temperature: 控制随机性 (0.0 表示确定性输出)
         top_p: 控制采样多样性
@@ -49,7 +55,7 @@ def unified_chat_completion(
         **kwargs: 传递给 API 的其他参数
         
     Returns:
-        API 响应对象或结构化数据
+        根据return_format返回API响应对象、Pydantic对象、字典或JSON字符串
     """
     # 如果未提供client，假设使用全局定义的client
     if client is None:
@@ -61,13 +67,13 @@ def unified_chat_completion(
     
     # 如果未提供provider，尝试从model名称推断
     if provider is None:
-        if model.startswith(("gpt-")):
+        if model.startswith(("gpt-", "claude-", "text-", "mistral-", "dall-e")):
             provider = "openai"
         elif "openrouter" in model or "/" in model:  # openrouter经常使用带命名空间的模型名
             provider = "openrouter"
         else:
-            # 默认使用vllm作为provider
-            provider = "vllm"
+            # 默认使用openai作为provider
+            provider = "openai"
     
     # 构建基本参数
     params = {
@@ -110,12 +116,30 @@ def unified_chat_completion(
                     params["extra_body"] = {}
                 params["extra_body"]["guided_decoding_backend"] = "outlines"
                 
-            return client.beta.chat.completions.parse(**params)
+            response = client.beta.chat.completions.parse(**params)
+            
+            # 根据return_format处理返回结果
+            content = response.choices[0].message.content
+            if return_format == "dict":
+                return content.model_dump()
+            elif return_format == "json":
+                return content.model_dump_json()
+            else:  # "pydantic"
+                return content
             
         elif provider == "openai":
             # OpenAI的结构化输出方式
             params["response_format"] = response_format
-            return client.beta.chat.completions.parse(**params)
+            response = client.beta.chat.completions.parse(**params)
+            
+            # 根据return_format处理返回结果
+            content = response.choices[0].message.content
+            if return_format == "dict":
+                return content.model_dump()
+            elif return_format == "json":
+                return content.model_dump_json()
+            else:  # "pydantic"
+                return content
             
         elif provider == "openrouter":
             # OpenRouter的结构化输出方式
@@ -129,45 +153,51 @@ def unified_chat_completion(
             params["response_format"] = schema
             
             response = client.chat.completions.create(**params)
-            return response_format.model_validate_json(response.choices[0].message.content)
+            # 获取返回的JSON字符串
+            json_str = response.choices[0].message.content
+            
+            # 根据return_format处理返回结果
+            if return_format == "json":
+                return json_str
+            elif return_format == "dict":
+                return json.loads(json_str)
+            else:  # "pydantic"
+                return response_format.model_validate_json(json_str)
     else:
         # 普通聊天完成
         return client.chat.completions.create(**params)
 
 
+# 实用的辅助函数，获取结构化数据
 def get_structured_data(
     messages: List[Dict[str, str]],
     schema_class: Type[T],
     model: str,
+    return_format: Literal["pydantic", "dict", "json"] = "dict",  # 默认返回字典
     provider: Optional[str] = None,
     **kwargs
-) -> T:
+) -> Union[T, Dict, str]:
     """
-    简化的函数，直接返回结构化数据对象，而不是API响应
+    简化的函数，直接返回结构化数据，可选返回格式
     
     Args:
         messages: 发送给模型的消息列表
         schema_class: Pydantic模型类
         model: 使用的模型名称
+        return_format: 返回格式：pydantic, dict 或 json
         provider: 模型提供商
         **kwargs: 其他参数
         
     Returns:
-        结构化数据对象
+        结构化数据（Pydantic对象、字典或JSON字符串）
     """
-    response = unified_chat_completion(
+    return unified_chat_completion(
         messages=messages,
         model=model,
         response_format=schema_class,
         provider=provider,
+        return_format=return_format,
         **kwargs
     )
-    
-    # 根据不同provider处理返回结果
-    if provider == "openrouter" or kwargs.get("provider") == "openrouter":
-        # openrouter已经在unified_chat_completion中处理了返回值
-        return response
-    else:
-        # openai和vllm的返回格式
-        return response.choices[0].message.content
+
 
