@@ -10,10 +10,11 @@ from tqdm import tqdm
 import time
 
 class ChunkInfo(BaseModel):
-	chunk_id: int 
-	summary: str 
-	key_findings: str
-	keywords: list
+    chunk_id: int 
+    summary: str 
+    key_findings: str
+    keywords: list
+    original_page_id: list[int]
 
 model_name = "openai/gpt-4.1-mini"
 
@@ -75,6 +76,7 @@ def extract_info_by_llm(
     system_prompt = """Please summarize the following text. The summary should focus on the main findings, recommendations, and any key data point. The summary should be concise, capturing the essential information, and no longer than 100 words. Additionally, extract the following metadata:
     - key findings: The main findings or conclusions of the content.
     - keywords: 3-5 keywords that capture the main themes of the content.
+    - original_page_id: where the original contents belong 
     """
     
     messages = [
@@ -171,7 +173,7 @@ if __name__ == '__main__':
     html = html_cleaning(html_content, clean_svg = True, clean_base64 = True)
 
     # 使用h2标签作为分块标志
-    chunks = chunk_html_by_headings(html_content, heading_tags=["h2", "h3", "table"])
+    chunks,chunk_start_pages = chunk_html_by_headings(html_content, heading_tags=["h2", "h3", "table"])
 
     # 打印分块结果
     print(f"分成了{len(chunks)}个块")
@@ -179,6 +181,8 @@ if __name__ == '__main__':
         print(f"块 {i+1} 长度: {len(chunk)} 字符")
     # index = 0
     # HTML_CONENT = chunks[index]
+
+    # print(chunks)
 
     process_html_chunks(
         chunks=chunks,
